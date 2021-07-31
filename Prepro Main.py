@@ -10,6 +10,7 @@ import imutils
 IMAGE_SIZE = 512
 REMOVE_BORDERS_PERCENTAGE = 0.1
 
+
 def crop_square(img, size, interpolation=cv2.INTER_AREA):
     h, w = img.shape[:2]
     min_size = np.amin([h,w])
@@ -50,9 +51,18 @@ def removeBordersByPercentage(image, percentage=REMOVE_BORDERS_PERCENTAGE):
     return image[cropPixelsW:width-cropPixelsW, cropPixelsH:height-cropPixelsH]
 
 
-    
 base_path = os.path.join("D:\Máster MUIIA\Prácticas\TFM\siim-isic-melanoma-classification\jpeg")
-    
+
+
+def checkCntTouchesCorners(cnt, imgWidth, imgHeight):
+    x, y, w, h = cv2.boundingRect(cnt)
+    touchesTopLeft = x == 0 and y == 0
+    touchesTopRight = x + w == imgWidth and y == 0
+    touchesBottomLeft = x == 0 and y + h == imgHeight
+    touchesBottomRight = x + w == imgWidth and y + h == imgHeight
+    return touchesTopLeft or touchesTopRight or touchesBottomLeft or touchesBottomRight
+
+
 for root, dirs, files in os.walk(base_path, topdown=False):
     for file in files:
         if file == "desktop.ini":
@@ -65,7 +75,7 @@ for root, dirs, files in os.walk(base_path, topdown=False):
         numpyarray = np.asarray(bytes, dtype=np.uint8)
         image = cv2.imdecode(numpyarray, cv2.IMREAD_UNCHANGED)
 
-        resizedOnlyWidthImage =  resizeOnlyWidth(image)
+        resizedOnlyWidthImage = resizeOnlyWidth(image)
         removedHairImage = hair_remove(resizedOnlyWidthImage)
         removedBordersImage = removeBordersByPercentage(removedHairImage)
 
@@ -94,26 +104,22 @@ for root, dirs, files in os.walk(base_path, topdown=False):
         numContours = len(cnts)
         print("HAY ", numContours, " contours")
 
+        imgHeight, imgWidth = th7.shape
+
         sumPerimeter = 0
         sumBlackAmmount = 0
         contourData = list()
-        for cntIndex in range(len(cnts)):
+        for cntIndex in range(numContours):
             cnt = cnts[cntIndex]
+            if checkCntTouchesCorners(cnt, imgWidth, imgHeight):
+                print("Ese contorno toca alguna esquina")
+
             perimeter = cv2.arcLength(cnt, False)
-            x,y,w,h = cv2.boundingRect(cnt)
-            (xcircle, ycircle), radius = cv2.minEnclosingCircle(cnt)
-            #ellipse = cv2.fitEllipse(cnt)
 
             mask = np.zeros(blur2.shape, np.uint8)
             cv2.drawContours(mask, cnts, cntIndex, 255, -1)
-
-            cv2.imwrite('mask.png', mask)
             mean = cv2.mean(blur2, mask=mask)
-            print("contoursColor",mean[0])
-
-            meanColor = np.array(cv2.mean(blur2[y:y+h,x:x+w])).astype(np.uint8)
-            print("rectColor",meanColor[0])
-            blackAmmount = 255-meanColor[0]
+            blackAmmount = 255-mean[0]
             if(blackAmmount<70 or perimeter<100): continue
 
 
@@ -128,17 +134,20 @@ for root, dirs, files in os.walk(base_path, topdown=False):
             sumBlackAmmount = sumBlackAmmount + blackAmmount
             
             # cv2.rectangle(removedBordersImage,(x,y),(x+w,y+h),(0,255,0),2)
-            cv2.circle(removedBordersImage, (int(xcircle), int(ycircle)), int(radius), (0, 255, 0), 2)
+            #cv2.circle(removedBordersImage, (int(xcircle), int(ycircle)), int(radius), (0, 255, 0), 2)
             #cv2.ellipse(removedBordersImage,ellipse,(0,255,0),2)
             #cv2.imshow('cutted contour',removedBordersImage[y:y+h,x:x+w])
             #cv2.waitKey(0)
-
-
-            print("perimeter", perimeter, "blackAmmount", blackAmmount)
+            #print(cnt)
             # draw the contour and center of the shape on the image
             cv2.drawContours(removedBordersImage, [cnt], -1, (0, 255, 0), 2)
             cv2.circle(removedBordersImage, (cX, cY), 7, (255, 255, 255), -1)
-            cv2.imshow("CONT", removedBordersImage)
+            cv2.putText(removedBordersImage, "B:" + str(int(blackAmmount)), (cX - 20, cY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 5)
+            cv2.putText(removedBordersImage, "B:" + str(int(blackAmmount)), (cX - 20, cY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            cv2.putText(removedBordersImage, "P:" + str(int(perimeter)), (cX - 20, cY + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(0, 0, 0), 5)
+            cv2.putText(removedBordersImage, "P:" + str(int(perimeter)), (cX - 20, cY + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(0, 0, 255), 2)
+
+            cv2.imshow(file, removedBordersImage)
             cv2.waitKey(0)
 
         contoursCenterX = 0
@@ -164,10 +173,16 @@ for root, dirs, files in os.walk(base_path, topdown=False):
             #cv2.drawContours(removedBordersImage, [c], -1, (0, 255, 0), 2)
             #cv2.circle(removedBordersImage, (cX, cY), 7, (255, 255, 255), -1)
             cv2.circle(removedBordersImage, (contoursCenterX, contoursCenterY), 7, (0, 0, 255), -1)
-            cv2.putText(removedBordersImage, "center", (contoursCenterX - 20, contoursCenterY - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
             # show the image
-            cv2.imshow("CONT", removedBordersImage)
+            cv2.imshow(file, removedBordersImage)
             cv2.waitKey(0)
         if(contoursCenterX == 0):
-            cv2.imshow("NO CONTOURS", removedBordersImage)
+            text = "No contours detected" if numContours==0 else str(numContours) + " contours detected but discarted"
+            cv2.putText(removedBordersImage, text, (int(imgWidth/2), int(imgHeight/2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 5)
+            cv2.putText(removedBordersImage, text, (int(imgWidth / 2), int(imgHeight / 2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(0, 0, 255), 2)
+
+            cv2.drawContours(removedBordersImage, cnts, -1, 255, -1)
+            cv2.imshow(file, removedBordersImage)
             cv2.waitKey(0)
+
+        cv2.destroyAllWindows()
