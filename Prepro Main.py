@@ -6,20 +6,34 @@ import pandas as pd
 import time
 import math
 import imutils
+from pathlib import Path
 
 IMAGE_SIZE = 512
 REMOVE_BORDERS_PERCENTAGE = 0.1
 
 
-def crop_square(img, size, interpolation=cv2.INTER_AREA):
+def crop_square(img,cx,cy, cropPixelsW, cropPixelsH, size=IMAGE_SIZE, interpolation=cv2.INTER_AREA):
     h, w = img.shape[:2]
     min_size = np.amin([h,w])
+    if(cx == 0 or cy == 0):
+        cx = int(w / 2)
+        cy = int(h / 2)
+    else:
+        cx = cx + cropPixelsW
+        cy = cy + cropPixelsH
+        if(cx<min_size/2):
+            cx = int(min_size / 2)
+        if (cx > w-(min_size/2)):
+            cx = w-int(min_size/2)
+    #A cy no le hago ni caso porque ya está redimensionado a 512 y no se recorta nada solo se centra el eje X
+    cy = int(h / 2)
     # Centralize and crop
-    crop_img = img[int(h/2-min_size/2):int(h/2+min_size/2), int(w/2-min_size/2):int(w/2+min_size/2)]
+    crop_img = img[int(cy-min_size/2):int(cy+min_size/2), int(cx-min_size/2):int(cx+min_size/2)]
+
     resized = cv2.resize(crop_img, (size, size), interpolation=interpolation)
     return resized
 
-def resizeOnlyWidth(image,window_height=IMAGE_SIZE):
+def resizeWidthByHeight(image, window_height=IMAGE_SIZE):
     aspect_ratio = float(image.shape[1])/float(image.shape[0])
     window_width = window_height*aspect_ratio
     return cv2.resize(image, (int(window_width), int(window_height)))
@@ -44,14 +58,14 @@ def processImage(image, image_size=IMAGE_SIZE):
 
 
 def removeBordersByPercentage(image, percentage=REMOVE_BORDERS_PERCENTAGE):
-    width = image.shape[0]
-    height = image.shape[1]
-    cropPixelsW = math.trunc(width * percentage)
-    cropPixelsH = math.trunc(height * percentage)
-    return image[cropPixelsW:width-cropPixelsW, cropPixelsH:height-cropPixelsH]
+    height = image.shape[0]
+    width = image.shape[1]
+    cropPixelsHeight = math.trunc(height * percentage)
+    cropPixelsWidth = math.trunc(width * percentage)
+    return (image[cropPixelsHeight:width-cropPixelsHeight, cropPixelsWidth:width-cropPixelsWidth],cropPixelsWidth,cropPixelsHeight)
 
 
-base_path = os.path.join("D:\Máster MUIIA\Prácticas\TFM\siim-isic-melanoma-classification\jpeg")
+
 
 
 def checkCntTouchesCorners(cnt, imgWidth, imgHeight):
@@ -63,126 +77,159 @@ def checkCntTouchesCorners(cnt, imgWidth, imgHeight):
     return touchesTopLeft or touchesTopRight or touchesBottomLeft or touchesBottomRight
 
 
-for root, dirs, files in os.walk(base_path, topdown=False):
-    for file in files:
-        if file == "desktop.ini":
+def getCntsInfo(cnts):
+
+    numContours = len(cnts)
+    sumPerimeter = 0
+    sumArea = 0
+    sumBlackAmmount = 0
+    contourData = list()
+    for cntIndex in range(numContours):
+        cnt = cnts[cntIndex]
+        if checkCntTouchesCorners(cnt, imgWidth, imgHeight):
             continue
 
-        filePath = os.path.join(root, file)
+        perimeter = cv2.arcLength(cnt, False)
 
-        stream = open(filePath, "rb")
-        bytes = bytearray(stream.read())
-        numpyarray = np.asarray(bytes, dtype=np.uint8)
-        image = cv2.imdecode(numpyarray, cv2.IMREAD_UNCHANGED)
+        mask = np.zeros(blur1.shape, np.uint8)
+        cv2.drawContours(mask, cnts, cntIndex, 255, -1)
+        mean = cv2.mean(blur1, mask=mask)
+        blackAmmount = 255 - mean[0]
+        if (blackAmmount < 70 or perimeter < 100): continue
 
-        resizedOnlyWidthImage = resizeOnlyWidth(image)
+        M = cv2.moments(cnt)
+        area = int(M["m00"])
+        cX = int(M["m10"] / M["m00"])
+        cY = int(M["m01"] / M["m00"])
+
+        contourData.append([perimeter, area, blackAmmount, cX, cY])
+
+        sumArea = sumArea + area
+        sumPerimeter = sumPerimeter + perimeter
+        sumBlackAmmount = sumBlackAmmount + blackAmmount
+
+        # draw the contour and center of the shape on the image
+        cv2.drawContours(removedBordersImage, [cnt], -1, (0, 255, 0), 2)
+        cv2.circle(removedBordersImage, (cX, cY), 7, (255, 255, 255), -1)
+        cv2.putText(removedBordersImage, "B:" + str(int(blackAmmount)), (cX - 20, cY - 15), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (0, 0, 0), 5)
+        cv2.putText(removedBordersImage, "B:" + str(int(blackAmmount)), (cX - 20, cY - 15), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (0, 0, 255), 2)
+        cv2.putText(removedBordersImage, "P:" + str(int(perimeter)), (cX - 20, cY + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                    (0, 0, 0), 5)
+        cv2.putText(removedBordersImage, "P:" + str(int(perimeter)), (cX - 20, cY + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                    (0, 0, 255), 2)
+        if SHOW_IMGS:
+            cv2.imshow(fileNameFull, removedBordersImage)
+            cv2.waitKey(0)
+    return (contourData, sumPerimeter, sumArea, sumBlackAmmount)
+
+base_path = os.path.join("D:\Máster MUIIA\Prácticas\TFM\siim-isic-melanoma-classification\jpeg")
+SHOW_IMGS = False
+
+for root, dirs, files in os.walk(base_path, topdown=False):
+    for fileNameFull in files:
+        fileNameOnly = str(Path(fileNameFull).with_suffix(''))
+        if fileNameFull == "desktop.ini":
+            continue
+        filePath = os.path.join(root, fileNameFull)
+        originalImage = cv2.imdecode(np.asarray(bytearray(open(filePath, "rb").read()), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+
+        resizedOnlyWidthImage = resizeWidthByHeight(originalImage)
         removedHairImage = hair_remove(resizedOnlyWidthImage)
-        removedBordersImage = removeBordersByPercentage(removedHairImage)
-
-        grayImage = grayScale = cv2.cvtColor(removedBordersImage, cv2.COLOR_RGB2GRAY)
-        blur2 = cv2.GaussianBlur(grayImage,(21,21),0)
-        ret3,th6 = cv2.threshold(blur2,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
-
+        removedHairImageBackup = removedHairImage.copy()
+        (removedBordersImage,cropPixelsW,cropPixelsH) = removeBordersByPercentage(removedHairImage)
+        removedBordersImageBackup = removedBordersImage.copy()
+        imgHeight, imgWidth,_ = removedBordersImage.shape
+        grayImage = cv2.cvtColor(removedBordersImage, cv2.COLOR_RGB2GRAY)
+        blur1 = cv2.GaussianBlur(grayImage, (21, 21), 0)
+        ret3, threshold1 = cv2.threshold(blur1, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         #Limpieza de threshold con otro blur.
-        blur3 = cv2.GaussianBlur(th6,(11,11),0)
-        ret3,th7 = cv2.threshold(blur3,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        # TODO ver si merece aqui la pena meter un threshold manual agresivo para quitarme cosas.
+        blur2 = cv2.GaussianBlur(threshold1, (11, 11), 0)
+        ret3, threshold2 = cv2.threshold(blur2, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        cv2.imwrite('original.png', image)
-        cv2.imwrite('test.png', resizedOnlyWidthImage)
-        cv2.imwrite('test2.png', removedHairImage)
-        cv2.imwrite('test3.png', removedBordersImage)
-        cv2.imwrite('test4.png', grayImage)
-        cv2.imwrite('test15.png', blur2)
-        cv2.imwrite('test16.png', th6)
-        cv2.imwrite('test17.png', blur3)
-        cv2.imwrite('test18.png', th7)
-
-
-        cnts = cv2.findContours(th7.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cv2.findContours(threshold2.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
         cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:5]
         numContours = len(cnts)
-        print("HAY ", numContours, " contours")
 
-        imgHeight, imgWidth = th7.shape
+        (contourData, sumPerimeter, sumArea, sumBlackAmmount) = getCntsInfo(cnts)
 
-        sumPerimeter = 0
-        sumBlackAmmount = 0
-        contourData = list()
-        for cntIndex in range(numContours):
-            cnt = cnts[cntIndex]
-            if checkCntTouchesCorners(cnt, imgWidth, imgHeight):
-                print("Ese contorno toca alguna esquina")
-
-            perimeter = cv2.arcLength(cnt, False)
-
-            mask = np.zeros(blur2.shape, np.uint8)
-            cv2.drawContours(mask, cnts, cntIndex, 255, -1)
-            mean = cv2.mean(blur2, mask=mask)
-            blackAmmount = 255-mean[0]
-            if(blackAmmount<70 or perimeter<100): continue
-
-
-            M = cv2.moments(cnt)
-            area = int(M["m00"])
-            cX = int(M["m10"] / M["m00"])
-            cY = int(M["m01"] / M["m00"])
-
-            contourData.append([perimeter, blackAmmount, cX, cY])
-
-            sumPerimeter = sumPerimeter + perimeter
-            sumBlackAmmount = sumBlackAmmount + blackAmmount
-            
-            # cv2.rectangle(removedBordersImage,(x,y),(x+w,y+h),(0,255,0),2)
-            #cv2.circle(removedBordersImage, (int(xcircle), int(ycircle)), int(radius), (0, 255, 0), 2)
-            #cv2.ellipse(removedBordersImage,ellipse,(0,255,0),2)
-            #cv2.imshow('cutted contour',removedBordersImage[y:y+h,x:x+w])
-            #cv2.waitKey(0)
-            #print(cnt)
-            # draw the contour and center of the shape on the image
-            cv2.drawContours(removedBordersImage, [cnt], -1, (0, 255, 0), 2)
-            cv2.circle(removedBordersImage, (cX, cY), 7, (255, 255, 255), -1)
-            cv2.putText(removedBordersImage, "B:" + str(int(blackAmmount)), (cX - 20, cY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 5)
-            cv2.putText(removedBordersImage, "B:" + str(int(blackAmmount)), (cX - 20, cY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            cv2.putText(removedBordersImage, "P:" + str(int(perimeter)), (cX - 20, cY + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(0, 0, 0), 5)
-            cv2.putText(removedBordersImage, "P:" + str(int(perimeter)), (cX - 20, cY + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(0, 0, 255), 2)
-
-            cv2.imshow(file, removedBordersImage)
-            cv2.waitKey(0)
 
         contoursCenterX = 0
         contoursCenterY = 0
-        blackAmmountPercentage = 0.5
+        blackAmmountPercentage = 0.2
         perimeterPercentage = 1-blackAmmountPercentage
         for data in contourData:
-            perimeter = data[0]
-            blackAmmount = data[1]
-            contourCenterX = data[2]
-            contourCenterY = data[3] 
-
-
+            #Valorar el tema de que si hay algo centrado se quede centrado?
+            #TODO cambiar perímetro a área???
+            (perimeter,area,blackAmmount,contourCenterX,contourCenterY) = data
             perimeterImportance = perimeter / sumPerimeter
             blackImportance = blackAmmount / sumBlackAmmount
             totaImportance = blackAmmountPercentage*blackImportance + perimeterPercentage*perimeterImportance
 
             contoursCenterX = int(contoursCenterX + totaImportance*contourCenterX)
             contoursCenterY = int(contoursCenterY + totaImportance*contourCenterY)
-
-
-            # draw the contour and center of the shape on the image
-            #cv2.drawContours(removedBordersImage, [c], -1, (0, 255, 0), 2)
-            #cv2.circle(removedBordersImage, (cX, cY), 7, (255, 255, 255), -1)
             cv2.circle(removedBordersImage, (contoursCenterX, contoursCenterY), 7, (0, 0, 255), -1)
             # show the image
-            cv2.imshow(file, removedBordersImage)
-            cv2.waitKey(0)
+            if SHOW_IMGS:
+                cv2.imshow(fileNameFull, removedBordersImage)
+                cv2.waitKey(0)
         if(contoursCenterX == 0):
             text = "No contours detected" if numContours==0 else str(numContours) + " contours detected but discarted"
+            cv2.drawContours(removedBordersImage, cnts, -1, 255, -1)
             cv2.putText(removedBordersImage, text, (int(imgWidth/2), int(imgHeight/2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 5)
             cv2.putText(removedBordersImage, text, (int(imgWidth / 2), int(imgHeight / 2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(0, 0, 255), 2)
+            if SHOW_IMGS:
+                cv2.imshow(fileNameFull, removedBordersImage)
+                cv2.waitKey(0)
 
-            cv2.drawContours(removedBordersImage, cnts, -1, 255, -1)
-            cv2.imshow(file, removedBordersImage)
+        final_image = crop_square(removedHairImageBackup, contoursCenterX, contoursCenterY, cropPixelsW, cropPixelsH)
+
+        screenshotsBasePath = "preproScreens/"
+        screenshotsPath = screenshotsBasePath + fileNameOnly
+        try:
+            os.makedirs(screenshotsPath)
+        except FileExistsError:
+            pass
+        # cv2.imwrite(screenshotsPath+'/1original.jpg', originalImage)
+        cv2.imwrite(screenshotsPath+'/2resizedOnlyWidthImage.jpg', resizedOnlyWidthImage)
+        cv2.imwrite(screenshotsPath+'/3removedHairImage.jpg', removedHairImageBackup)
+        cv2.imwrite(screenshotsPath+'/4removedBordersImage.jpg', removedBordersImageBackup)
+        cv2.imwrite(screenshotsPath+'/5grayImage.jpg', grayImage)
+        cv2.imwrite(screenshotsPath+'/6blur1.jpg', blur1)
+        cv2.imwrite(screenshotsPath+'/7threshold1.jpg', threshold1)
+        cv2.imwrite(screenshotsPath+'/8blur2.jpg', blur2)
+        cv2.imwrite(screenshotsPath+'/9threshold2.jpg', threshold2)
+        cv2.imwrite(screenshotsPath+'/10removedBordersImage.jpg', removedBordersImage)
+        cv2.imwrite(screenshotsPath+'/11removedHairImage.jpg', removedHairImage)
+        cv2.imwrite(screenshotsPath+'/12final.jpg', final_image)
+
+
+        savePath = filePath.replace("D:\\Máster MUIIA\\Prácticas\\TFM\\siim-isic-melanoma-classification\\","")
+        savePath = "processedDataset/"+savePath.replace("\\", "/")
+        try:
+            os.makedirs(os.path.dirname(savePath))
+        except FileExistsError:
+            pass
+
+        cv2.imwrite(savePath, final_image)
+
+        fig = plt.figure()
+        fig.suptitle(fileNameOnly)
+        plt.subplot(1, 2, 1)
+        plt.imshow(cv2.cvtColor(originalImage, cv2.COLOR_BGR2RGB))
+        plt.axis('off')
+        plt.title('Original:')
+        plt.subplot(1, 2, 2)
+        plt.imshow(cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB))
+        plt.axis('off')
+        plt.title('Preprocessed:')
+        plt.plot()
+        plt.savefig(screenshotsBasePath + fileNameOnly + "_comparison.jpg")
+        plt.close()
+        if SHOW_IMGS:
+            cv2.imshow(fileNameFull, final_image)
             cv2.waitKey(0)
-
-        cv2.destroyAllWindows()
+            cv2.destroyAllWindows()
