@@ -10,7 +10,6 @@ from Utils import *
 
 
 base_path = os.path.join("D:\Máster MUIIA\Prácticas\TFM\siim-isic-melanoma-classification\jpeg")
-SHOW_IMGS = False
 numProcessed = 0
 
 for root, dirs, files in os.walk(base_path, topdown=False):
@@ -50,7 +49,7 @@ for root, dirs, files in os.walk(base_path, topdown=False):
 
         cntsInfo = getCntsInfo(cnts, imgWidth, imgHeight, blur1, removedBordersImage, fileNameFull)
 
-        (contoursCenterX, contoursCenterY) = getCenterFromContoursData(cntsInfo, removedBordersImage, fileNameFull)
+        (contoursCenterX, contoursCenterY) = getCenterFromContoursData(cntsInfo, removedBordersImage, fileNameFull, imgWidth)
 
 
         if(contoursCenterX == 0):

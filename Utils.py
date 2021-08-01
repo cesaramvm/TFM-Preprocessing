@@ -5,6 +5,7 @@ import math
 
 IMAGE_SIZE = 224
 REMOVE_BORDERS_PERCENTAGE = 0.1
+SHOW_IMGS = False
 
 def crop_square(img,cx,cy, cropPixelsW, cropPixelsH, size=IMAGE_SIZE, interpolation=cv2.INTER_AREA):
     h, w = img.shape[:2]
@@ -72,7 +73,7 @@ def checkCntTouchesCorners(cnt, imgWidth, imgHeight):
     return touchesTopLeft or touchesTopRight or touchesBottomLeft or touchesBottomRight
 
 
-def getCntsInfo(cnts, imgWidth, imgHeight, blur1, removedBordersImage, fileNameFull, SHOW_IMGS = False):
+def getCntsInfo(cnts, imgWidth, imgHeight, blur1, removedBordersImage, fileNameFull, showImgs = SHOW_IMGS):
 
     numContours = len(cnts)
     sumPerimeter = 0
@@ -114,32 +115,43 @@ def getCntsInfo(cnts, imgWidth, imgHeight, blur1, removedBordersImage, fileNameF
                     (0, 0, 0), 5)
         cv2.putText(removedBordersImage, "P:" + str(int(perimeter)), (cX - 20, cY + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     (0, 0, 255), 2)
-        if SHOW_IMGS:
+        if showImgs:
             cv2.imshow(fileNameFull, removedBordersImage)
             cv2.waitKey(0)
     return (contoursData, sumPerimeter, sumArea, sumBlackAmmount)
 
 
-def getCenterFromContoursData(cntsInfo, removedBordersImage, fileNameFull, SHOW_IMGS = False):
+def getCenterFromContoursData(cntsInfo, removedBordersImage, fileNameFull, imgWidth, showImgs = SHOW_IMGS):
     (contoursData, sumPerimeter, sumArea, sumBlackAmmount) = cntsInfo
     contoursCenterX = 0
     contoursCenterY = 0
+    imgCenter = int(imgWidth/2)
 
-    blackAmmountPercentage = 0.2
-    perimeterPercentage = 1 - blackAmmountPercentage
+    contourScoreSum = 1
+    contourScores = list()
     for data in contoursData:
         # Valorar el tema de que si hay algo centrado se quede centrado?
         # TODO cambiar perímetro a área???
         (perimeter, area, blackAmmount, contourCenterX, contourCenterY) = data
-        perimeterImportance = perimeter / sumPerimeter
-        blackImportance = blackAmmount / sumBlackAmmount
-        totaImportance = blackAmmountPercentage * blackImportance + perimeterPercentage * perimeterImportance
+        distanceFromMiddle = abs(imgCenter - contourCenterX)
+        imgCenteredPercentage = 1-(distanceFromMiddle/(imgCenter*1.2))
+        imgAreaPercentage = area / sumArea
+        contourScore = blackAmmount * imgAreaPercentage * imgCenteredPercentage
+        contourScores.append(contourScore)
+        contourScoreSum = contourScoreSum + contourScore
 
-        contoursCenterX = int(contoursCenterX + totaImportance * contourCenterX)
-        contoursCenterY = int(contoursCenterY + totaImportance * contourCenterY)
+    for contourIndex in range(len(contoursData)):
+        data = contoursData[contourIndex]
+        (perimeter, area, blackAmmount, contourCenterX, contourCenterY) = data
+        contourScore = contourScores[contourIndex]
+        scorePercentage = contourScore/contourScoreSum
+
+
+        contoursCenterX = int(contoursCenterX + scorePercentage * contourCenterX)
+        contoursCenterY = int(contoursCenterY + scorePercentage * contourCenterY)
         cv2.circle(removedBordersImage, (contoursCenterX, contoursCenterY), 7, (0, 0, 255), -1)
         # show the image
-        if SHOW_IMGS:
+        if showImgs:
             cv2.imshow(fileNameFull, removedBordersImage)
             cv2.waitKey(0)
     return (contoursCenterX, contoursCenterY)
