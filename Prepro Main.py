@@ -19,16 +19,17 @@ for root, dirs, files in os.walk(base_path, topdown=False):
         if fileNameFull == "desktop.ini":
             continue
         filePath = os.path.join(root, fileNameFull)
-        savePath = filePath.replace("D:\\Máster MUIIA\\Prácticas\\TFM\\siim-isic-melanoma-classification\\","")
-        savePath = "processedDataset/"+savePath.replace("\\", "/")
-        if(os.path.isfile(savePath)):
+        savePath = filePath.replace("D:\\Máster MUIIA\\Prácticas\\TFM\\siim-isic-melanoma-classification\\jpeg", "")
+        savePath224 = "processedDataset/jpeg224" + savePath.replace("\\", "/")
+        savePath331 = "processedDataset/jpeg331" + savePath.replace("\\", "/")
+        if(os.path.isfile(savePath224) and os.path.isfile(savePath331)):
             print(fileNameOnly, " ya se ha preprocesado (",numProcessed,")" )
             continue
 
         print(fileNameOnly, " procesando (", numProcessed, ")")
         originalImage = cv2.imdecode(np.asarray(bytearray(open(filePath, "rb").read()), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
 
-        resizedOnlyWidthImage = resizeWidthByHeight(originalImage)
+        resizedOnlyWidthImage = resizeWidthByHeight(originalImage, IMAGE_SIZE_331)
         removedHairImage = hair_remove(resizedOnlyWidthImage)
         removedHairImageBackup = removedHairImage.copy()
         (removedBordersImage,cropPixelsW,cropPixelsH) = removeBordersByPercentage(removedHairImage)
@@ -57,11 +58,12 @@ for root, dirs, files in os.walk(base_path, topdown=False):
             cv2.drawContours(removedBordersImage, cnts, -1, 255, -1)
             cv2.putText(removedBordersImage, text, (int(imgWidth/2), int(imgHeight/2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 5)
             cv2.putText(removedBordersImage, text, (int(imgWidth / 2), int(imgHeight / 2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(0, 0, 255), 2)
-            if SHOW_IMGS:
+            if SHOW_CENTER_CALCULATION:
                 cv2.imshow(fileNameFull, removedBordersImage)
                 cv2.waitKey(0)
 
-        final_image = crop_square(removedHairImageBackup, contoursCenterX, contoursCenterY, cropPixelsW, cropPixelsH)
+        final_image331 = crop_square(removedHairImageBackup, contoursCenterX, contoursCenterY, cropPixelsW, cropPixelsH, IMAGE_SIZE_331)
+        final_image224 = crop_square(removedHairImageBackup, contoursCenterX, contoursCenterY, cropPixelsW, cropPixelsH, IMAGE_SIZE_224)
 
         screenshotsBasePath = "preproScreens/"
         screenshotsPath = screenshotsBasePath + fileNameOnly
@@ -80,7 +82,7 @@ for root, dirs, files in os.walk(base_path, topdown=False):
         cv2.imwrite(screenshotsPath+'/9threshold2.jpg', threshold2)
         cv2.imwrite(screenshotsPath+'/10removedBordersImage.jpg', removedBordersImage)
         cv2.imwrite(screenshotsPath+'/11removedHairImage.jpg', removedHairImage)
-        cv2.imwrite(screenshotsPath+'/12final.jpg', final_image)
+        cv2.imwrite(screenshotsPath +'/12final.jpg', final_image331)
         fig = plt.figure()
         fig.suptitle(fileNameOnly)
         plt.subplot(1, 2, 1)
@@ -88,7 +90,7 @@ for root, dirs, files in os.walk(base_path, topdown=False):
         plt.axis('off')
         plt.title('Original:')
         plt.subplot(1, 2, 2)
-        plt.imshow(cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB))
+        plt.imshow(cv2.cvtColor(final_image331, cv2.COLOR_BGR2RGB))
         plt.axis('off')
         plt.title('Preprocessed:')
         plt.plot()
@@ -97,13 +99,18 @@ for root, dirs, files in os.walk(base_path, topdown=False):
 
 
         try:
-            os.makedirs(os.path.dirname(savePath))
+            os.makedirs(os.path.dirname(savePath224))
+        except FileExistsError:
+            pass
+        try:
+            os.makedirs(os.path.dirname(savePath331))
         except FileExistsError:
             pass
 
-        cv2.imwrite(savePath, final_image)
+        cv2.imwrite(savePath331, final_image331)
+        cv2.imwrite(savePath224, final_image224)
 
-        if SHOW_IMGS:
-            cv2.imshow(fileNameFull, final_image)
+        if SHOW_RESULT:
+            cv2.imshow(fileNameFull, final_image331)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
