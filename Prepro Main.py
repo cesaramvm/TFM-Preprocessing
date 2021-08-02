@@ -7,19 +7,22 @@ from pathlib import Path
 from Utils import *
 
 
+# path = "D:\Máster MUIIA\Prácticas\TFM\siim-isic-melanoma-classification\jpeg"
+# path = "G:\Mi unidad\Prácticas\TFM\siim-isic-melanoma-classification\jpeg"
+path = "D:\siim-isic-melanoma-classification\jpeg"
+path = os.path.join(path)
 
-
-base_path = os.path.join("D:\Máster MUIIA\Prácticas\TFM\siim-isic-melanoma-classification\jpeg")
 numProcessed = 0
 
-for root, dirs, files in os.walk(base_path, topdown=False):
+for root, dirs, files in os.walk(path, topdown=False):
     for fileNameFull in files:
+        allProcessStartTime = time.time()
         numProcessed=numProcessed+1
         fileNameOnly = str(Path(fileNameFull).with_suffix(''))
         if fileNameFull == "desktop.ini":
             continue
         filePath = os.path.join(root, fileNameFull)
-        savePath = filePath.replace("D:\\Máster MUIIA\\Prácticas\\TFM\\siim-isic-melanoma-classification\\jpeg", "")
+        savePath = filePath.replace(path, "")
         savePath224 = "processedDataset/jpeg224" + savePath.replace("\\", "/")
         savePath331 = "processedDataset/jpeg331" + savePath.replace("\\", "/")
         if(os.path.isfile(savePath224) and os.path.isfile(savePath331)):
@@ -72,32 +75,34 @@ for root, dirs, files in os.walk(base_path, topdown=False):
         except FileExistsError:
             pass
         # cv2.imwrite(screenshotsPath+'/1original.jpg', originalImage)
-        cv2.imwrite(screenshotsPath+'/2resizedOnlyWidthImage.jpg', resizedOnlyWidthImage)
-        cv2.imwrite(screenshotsPath+'/3removedHairImage.jpg', removedHairImageBackup)
-        cv2.imwrite(screenshotsPath+'/4removedBordersImage.jpg', removedBordersImageBackup)
-        cv2.imwrite(screenshotsPath+'/5grayImage.jpg', grayImage)
-        cv2.imwrite(screenshotsPath+'/6blur1.jpg', blur1)
-        cv2.imwrite(screenshotsPath+'/7threshold1.jpg', threshold1)
-        cv2.imwrite(screenshotsPath+'/8blur2.jpg', blur2)
-        cv2.imwrite(screenshotsPath+'/9threshold2.jpg', threshold2)
-        cv2.imwrite(screenshotsPath+'/10removedBordersImage.jpg', removedBordersImage)
-        cv2.imwrite(screenshotsPath+'/11removedHairImage.jpg', removedHairImage)
-        cv2.imwrite(screenshotsPath +'/12final.jpg', final_image331)
-        fig = plt.figure()
-        fig.suptitle(fileNameOnly)
-        plt.subplot(1, 2, 1)
-        plt.imshow(cv2.cvtColor(originalImage, cv2.COLOR_BGR2RGB))
-        plt.axis('off')
-        plt.title('Original:')
-        plt.subplot(1, 2, 2)
-        plt.imshow(cv2.cvtColor(final_image331, cv2.COLOR_BGR2RGB))
-        plt.axis('off')
-        plt.title('Preprocessed:')
-        plt.plot()
-        plt.savefig(screenshotsBasePath + fileNameOnly + "_comparison.jpg")
-        plt.close()
+        import time
 
-
+        saveImgsStartTime = time.time()
+        import threading
+        p = threading.Thread(target=saveImg, args=(resizedOnlyWidthImage.copy(), screenshotsPath+'/2resizedOnlyWidthImage.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(removedHairImageBackup.copy(), screenshotsPath+'/3removedHairImage.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(removedBordersImageBackup.copy(), screenshotsPath+'/4removedBordersImage.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(grayImage.copy(), screenshotsPath+'/5grayImage.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(blur1.copy(), screenshotsPath+'/6blur1.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(threshold1.copy(), screenshotsPath+'/7threshold1.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(blur2.copy(), screenshotsPath+'/8blur2.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(threshold2.copy(), screenshotsPath+'/9threshold2.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(removedBordersImage.copy(), screenshotsPath+'/10removedBordersImage.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(removedHairImage.copy(), screenshotsPath+'/11removedHairImage.jpg'))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(final_image331.copy(), screenshotsPath+'/12final.jpg'))
+        p.start()
+        p = threading.Thread(target=saveComparisonChart, args=(originalImage.copy(), final_image331.copy(), fileNameOnly, screenshotsBasePath + fileNameOnly + "_comparison.jpg"))
+        p.start()
         try:
             os.makedirs(os.path.dirname(savePath224))
         except FileExistsError:
@@ -107,9 +112,13 @@ for root, dirs, files in os.walk(base_path, topdown=False):
         except FileExistsError:
             pass
 
-        cv2.imwrite(savePath331, final_image331)
-        cv2.imwrite(savePath224, final_image224)
-
+        p = threading.Thread(target=saveImg, args=(final_image331.copy(), savePath331))
+        p.start()
+        p = threading.Thread(target=saveImg, args=(final_image224.copy(), savePath224))
+        p.start()
+        finishTime = time.time()
+        print("--- %s All seconds ---" % (finishTime - allProcessStartTime))
+        print("--- %s Save threads seconds ---" % (finishTime - saveImgsStartTime))
         if SHOW_RESULT:
             cv2.imshow(fileNameFull, final_image331)
             cv2.waitKey(0)

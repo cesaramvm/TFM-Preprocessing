@@ -1,16 +1,17 @@
 import numpy as np
 import cv2
 import math
+import matplotlib.pyplot as plt
 
 
 IMAGE_SIZE_224 = 224
 IMAGE_SIZE_331 = 331
 REMOVE_BORDERS_PERCENTAGE = 0.1
-# SHOW_CENTER_CALCULATION = True
 # SHOW_CONTOURS = True
+# SHOW_CENTER_CALCULATION = True
 # SHOW_RESULT = True
-SHOW_CENTER_CALCULATION = False
 SHOW_CONTOURS = False
+SHOW_CENTER_CALCULATION = False
 SHOW_RESULT = False
 
 def crop_square(img, cx, cy, cropPixelsW, cropPixelsH, size, interpolation=cv2.INTER_AREA):
@@ -183,3 +184,22 @@ def getCenterFromContoursData(cntsInfo, removedBordersImage, fileNameFull, imgWi
             cv2.imshow(fileNameFull, removedBordersImage)
             cv2.waitKey(0)
     return (contoursCenterX, contoursCenterY)
+
+
+def saveImg(img, path):
+    cv2.imwrite(path, img)
+
+def saveComparisonChart(originalImage, finalImage, fileName, path):
+    fig = plt.figure()
+    fig.suptitle(fileName)
+    plt.subplot(1, 2, 1)
+    plt.imshow(cv2.cvtColor(originalImage, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    plt.title('Original:')
+    plt.subplot(1, 2, 2)
+    plt.imshow(cv2.cvtColor(finalImage, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    plt.title('Preprocessed:')
+    plt.plot()
+    plt.savefig(path)
+    plt.close()
