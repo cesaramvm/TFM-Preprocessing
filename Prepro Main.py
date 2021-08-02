@@ -10,7 +10,8 @@ from Utils import *
 
 # path = "D:\Máster MUIIA\Prácticas\TFM\siim-isic-melanoma-classification\jpeg"
 # path = "G:\Mi unidad\Prácticas\TFM\siim-isic-melanoma-classification\jpeg"
-path = "D:\siim-isic-melanoma-classification\jpeg"
+# path = "D:\siim-isic-melanoma-classification\jpeg"
+path = "C:\Preprocesado\dataset\jpeg"
 path = os.path.join(path)
 
 numProcessed = 0
@@ -23,8 +24,8 @@ for root, dirs, files in os.walk(path, topdown=False):
             continue
         filePath = os.path.join(root, fileNameFull)
         savePath = filePath.replace(path, "")
-        savePath224 = "processedDataset/jpeg224" + savePath.replace("\\", "/")
-        savePath331 = "processedDataset/jpeg331" + savePath.replace("\\", "/")
+        savePath224 = "dataset/jpeg224" + savePath.replace("\\", "/")
+        savePath331 = "dataset/jpeg331" + savePath.replace("\\", "/")
         if(os.path.isfile(savePath224) and os.path.isfile(savePath331)):
             print(fileNameOnly, " ya se ha preprocesado (",numProcessed,")" )
             continue
@@ -62,7 +63,7 @@ for root, dirs, files in os.walk(path, topdown=False):
 
         final_image331 = crop_square(removedHairImageBackup, contoursCenterX, contoursCenterY, cropPixelsW, cropPixelsH, IMAGE_SIZE_331)
         final_image224 = crop_square(removedHairImageBackup, contoursCenterX, contoursCenterY, cropPixelsW, cropPixelsH, IMAGE_SIZE_224)
-
+        '''
         screenshotsBasePath = "preproScreens/"
         screenshotsPath = screenshotsBasePath + fileNameOnly
         try:
@@ -94,8 +95,7 @@ for root, dirs, files in os.walk(path, topdown=False):
         plt.plot()
         plt.savefig(screenshotsBasePath + fileNameOnly + "_comparison.jpg")
         plt.close()
-
-
+        '''
         try:
             os.makedirs(os.path.dirname(savePath224))
         except FileExistsError:
