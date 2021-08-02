@@ -31,7 +31,6 @@ def crop_square(img, cx, cy, cropPixelsW, cropPixelsH, size, interpolation=cv2.I
     cy = int(h / 2)
     # Centralize and crop
     crop_img = img[int(cy-min_size/2):int(cy+min_size/2), int(cx-min_size/2):int(cx+min_size/2)]
-
     resized = cv2.resize(crop_img, (size, size), interpolation=interpolation)
     return resized
 
@@ -39,8 +38,6 @@ def resizeWidthByHeight(image, window_height):
     aspect_ratio = float(image.shape[1])/float(image.shape[0])
     window_width = window_height*aspect_ratio
     return cv2.resize(image, (int(window_width), int(window_height)))
-
-
 def hair_remove(image):
     # convert image to grayScale
     grayScale = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -118,13 +115,10 @@ def getCntsInfo(cnts, imgWidth, imgHeight, blur1, removedBordersImage, fileNameF
         area = int(M["m00"])
         cX = int(M["m10"] / M["m00"])
         cY = int(M["m01"] / M["m00"])
-
         contoursData.append([perimeter, area, blackAmmount, cX, cY])
-
         sumArea = sumArea + area
         sumPerimeter = sumPerimeter + perimeter
         sumBlackAmmount = sumBlackAmmount + blackAmmount
-
         # draw the contour and center of the shape on the image
         cv2.drawContours(removedBordersImage, [cnt], -1, (0, 255, 0), 2)
         cv2.circle(removedBordersImage, (cX, cY), 7, (255, 255, 255), -1)
@@ -168,14 +162,11 @@ def getCenterFromContoursData(cntsInfo, removedBordersImage, fileNameFull, imgWi
         contourScore = blackAmmount * imgAreaPercentage * imgCenteredPercentage
         contourScores.append(contourScore)
         contourScoreSum = contourScoreSum + contourScore
-
     for contourIndex in range(len(contoursData)):
         data = contoursData[contourIndex]
         (perimeter, area, blackAmmount, contourCenterX, contourCenterY) = data
         contourScore = contourScores[contourIndex]
         scorePercentage = contourScore/contourScoreSum
-
-
         contoursCenterX = int(contoursCenterX + scorePercentage * contourCenterX)
         contoursCenterY = int(contoursCenterY + scorePercentage * contourCenterY)
         cv2.circle(removedBordersImage, (contoursCenterX, contoursCenterY), 7, (0, 0, 255), -1)
@@ -184,22 +175,3 @@ def getCenterFromContoursData(cntsInfo, removedBordersImage, fileNameFull, imgWi
             cv2.imshow(fileNameFull, removedBordersImage)
             cv2.waitKey(0)
     return (contoursCenterX, contoursCenterY)
-
-
-def saveImg(img, path):
-    cv2.imwrite(path, img)
-
-def saveComparisonChart(originalImage, finalImage, fileName, path):
-    fig = plt.figure()
-    fig.suptitle(fileName)
-    plt.subplot(1, 2, 1)
-    plt.imshow(cv2.cvtColor(originalImage, cv2.COLOR_BGR2RGB))
-    plt.axis('off')
-    plt.title('Original:')
-    plt.subplot(1, 2, 2)
-    plt.imshow(cv2.cvtColor(finalImage, cv2.COLOR_BGR2RGB))
-    plt.axis('off')
-    plt.title('Preprocessed:')
-    plt.plot()
-    plt.savefig(path)
-    plt.close()
