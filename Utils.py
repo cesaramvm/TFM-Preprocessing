@@ -2,9 +2,6 @@ import numpy as np
 import cv2
 import math
 
-IMAGE_SIZE_224 = 224
-IMAGE_SIZE_331 = 331
-REMOVE_BORDERS_PERCENTAGE = 0.1
 # SHOW_CONTOURS = True
 # SHOW_CENTER_CALCULATION = True
 # SHOW_RESULT = True
